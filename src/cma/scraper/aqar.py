@@ -3,6 +3,8 @@ import re
 from dataclasses import dataclass
 
 from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from cma.config import settings
 from cma.scraper.stealth import (
@@ -101,17 +103,34 @@ class AqarScraper:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=self.headless)
             viewport = random_viewport()
-            context = await browser.new_context(
-                user_agent=random_user_agent(),
-                viewport=viewport,
-                locale="ar-SA",
-            )
+            context_kwargs = {
+                "user_agent": random_user_agent(),
+                "viewport": viewport,
+                "locale": "ar-SA",
+            }
+            if settings.proxy_server:
+                proxy_settings = {"server": settings.proxy_server}
+                if settings.proxy_username and settings.proxy_password:
+                    proxy_settings["username"] = settings.proxy_username
+                    proxy_settings["password"] = settings.proxy_password
+                context_kwargs["proxy"] = proxy_settings
+                logger.info(f"Using proxy: {settings.proxy_server}")
+
+            context = await browser.new_context(**context_kwargs)
             await apply_stealth(context)
             page = await context.new_page()
 
             try:
                 logger.info(f"Navigating to {search_url}")
-                await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(settings.scraper_max_retries),
+                    wait=wait_exponential(multiplier=1, min=2, max=10),
+                    retry=retry_if_exception_type(PlaywrightTimeoutError),
+                    reraise=True
+                ):
+                    with attempt:
+                        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                
                 await random_delay(2, 4)
 
                 page_num = 0
@@ -182,7 +201,15 @@ class AqarScraper:
     ) -> ScrapedListing | None:
         page = await context.new_page()
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(settings.scraper_max_retries),
+                wait=wait_exponential(multiplier=1, min=2, max=10),
+                retry=retry_if_exception_type(PlaywrightTimeoutError),
+                reraise=True
+            ):
+                with attempt:
+                    await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                    
             await random_delay(1, 2)
 
             raw_html = await page.content()

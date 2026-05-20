@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     aqar_base_url: str = "https://sa.aqar.fm"
     scraper_headless: bool = True
     max_listings_per_search: int = 50
+    proxy_server: str = ""
+    proxy_username: str = ""
+    proxy_password: str = ""
+    scraper_max_retries: int = 3
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
