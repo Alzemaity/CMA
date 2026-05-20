@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}CMA - البيانات جاهزة{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+
+    <!-- Success Banner -->
+    <div class="bg-gradient-to-l from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 mb-6 flex items-center gap-5">
+        <div class="text-5xl">✅</div>
+        <div>
+            <h1 class="text-xl font-bold text-green-800">المرحلة الأولى مكتملة!</h1>
+            <p class="text-green-700 text-sm mt-1">
+                تم جمع وتنظيف بيانات <strong>{{ report.listings_found }}</strong> إعلان
+                لـ <strong>{{ brief.property_type }}</strong> في حي <strong>{{ brief.neighborhood }}</strong>، {{ brief.city }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Two action cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+
+        <!-- Download Excel -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <div class="text-4xl">📊</div>
+                <div>
+                    <div class="font-bold text-gray-800 text-lg">تحميل بيانات الإكسيل</div>
+                    <div class="text-gray-500 text-sm">جميع الإعلانات بدون تقييم — مع رابط كل إعلان</div>
+                </div>
+            </div>
+            <div class="text-sm text-gray-600 bg-gray-50 rounded-xl p-3 leading-relaxed">
+                يحتوي الملف على:
+                <ul class="list-disc list-inside mt-1 space-y-1 text-gray-500">
+                    <li>{{ report.listings_found }} إعلان عقاري</li>
+                    <li>السعر، المساحة، سعر المتر، الغرف</li>
+                    <li>الحي، الشارع، المميزات</li>
+                    <li>رابط الإعلان الأصلي (قابل للنقر)</li>
+                </ul>
+            </div>
+            {% if report.report_excel_path %}
+            <a href="/api/cma/{{ report.id }}/excel"
+               class="w-full text-center bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+                ⬇ تحميل Excel
+            </a>
+            {% else %}
+            <div class="w-full text-center bg-gray-200 text-gray-500 py-3 rounded-xl font-semibold">
+                ملف Excel غير متوفر
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Start Phase 2 -->
+        <div class="bg-white rounded-2xl shadow-sm border border-primary-100 p-6 flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <div class="text-4xl">🧠</div>
+                <div>
+                    <div class="font-bold text-gray-800 text-lg">المرحلة الثانية: التحليل العميق</div>
+                    <div class="text-gray-500 text-sm">تحليل CMA كامل مع تقييم وتقرير PDF</div>
+                </div>
+            </div>
+            <div class="text-sm text-gray-600 bg-blue-50 rounded-xl p-3 leading-relaxed">
+                تشمل المرحلة الثانية:
+                <ul class="list-disc list-inside mt-1 space-y-1 text-gray-500">
+                    <li>مطابقة العقارات بمعاييرك</li>
+                    <li>تحليل الأسعار والمؤشرات</li>
+                    <li>ملخص تنفيذي بالذكاء الاصطناعي</li>
+                    <li>تقرير PDF احترافي</li>
+                </ul>
+            </div>
+            <form action="/cma/{{ report.id }}/analyze" method="POST">
+                <button type="submit"
+                    class="w-full bg-primary-500 text-white py-3 rounded-xl font-semibold hover:bg-primary-700 transition flex items-center justify-center gap-2">
+                    🚀 بدء التحليل العميق
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Back button -->
+    <div class="text-center">
+        <a href="/" class="text-gray-500 text-sm hover:text-gray-700 transition">← العودة إلى لوحة التحكم</a>
+    </div>
+</div>
+{% endblock %}

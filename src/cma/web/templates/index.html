@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}CMA - لوحة التحكم{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800">التقارير</h1>
+        <p class="text-gray-500 text-sm mt-1">جميع تحليلات السوق المقارنة</p>
+    </div>
+    <a href="/cma/new" class="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition">
+        + تحليل جديد
+    </a>
+</div>
+
+{% if reports %}
+<div class="grid gap-4">
+    {% for report in reports %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition">
+        <div class="flex items-center justify-between">
+            <a href="/cma/{{ report.id }}{% if report.status == 'scraped' %}/progress{% endif %}" class="flex-1">
+                <div class="font-semibold text-gray-800">
+                    {{ report.brief.property_type }} - {{ report.brief.neighborhood }}، {{ report.brief.city }}
+                </div>
+                <div class="text-sm text-gray-500 mt-1">
+                    {{ report.brief.offer_type }}
+                    {% if report.brief.bedrooms %} | {{ report.brief.bedrooms }} غرف{% endif %}
+                    {% if report.brief.min_price or report.brief.max_price %}
+                        |
+                        {% if report.brief.min_price %}{{ "{:,.0f}".format(report.brief.min_price) }}{% endif %}
+                        -
+                        {% if report.brief.max_price %}{{ "{:,.0f}".format(report.brief.max_price) }}{% endif %}
+                        ريال
+                    {% endif %}
+                </div>
+            </a>
+            <div class="text-left mr-4 flex flex-col items-end gap-1">
+                {% if report.status == 'done' %}
+                    <span class="inline-block bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-semibold">مكتمل</span>
+                {% elif report.status == 'scraped' %}
+                    <span class="inline-block bg-yellow-100 text-yellow-700 text-xs px-3 py-1 rounded-full font-semibold">📋 مرحلة 1 مكتملة</span>
+                {% elif report.status == 'failed' %}
+                    <span class="inline-block bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full font-semibold">فشل</span>
+                {% else %}
+                    <span class="inline-block bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-semibold">{{ report.status }}</span>
+                {% endif %}
+                <div class="text-xs text-gray-400">{{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '' }}</div>
+            </div>
+        </div>
+
+        <!-- Stats row -->
+        {% if report.status in ('done', 'scraped') %}
+        <div class="flex gap-4 mt-3 text-xs text-gray-500 border-t border-gray-50 pt-3">
+            <span>إعلانات مجموعة: {{ report.listings_found }}</span>
+            {% if report.status == 'done' %}
+            <span>مطابقة: {{ report.listings_matched }}</span>
+            {% endif %}
+            {% if report.report_excel_path %}
+            <a href="/api/cma/{{ report.id }}/excel"
+               class="mr-auto bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition"
+               onclick="event.stopPropagation()">
+                ⬇ Excel
+            </a>
+            {% endif %}
+            {% if report.status == 'done' and report.report_pdf_path %}
+            <a href="/api/cma/{{ report.id }}/pdf"
+               class="bg-red-50 text-red-700 border border-red-200 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-red-100 transition"
+               onclick="event.stopPropagation()">
+                ⬇ PDF
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <div class="text-gray-400 text-5xl mb-4">📊</div>
+    <h2 class="text-xl font-semibold text-gray-700">لا توجد تقارير بعد</h2>
+    <p class="text-gray-500 mt-2 mb-6">ابدأ بإنشاء أول تحليل للسوق المقارن</p>
+    <a href="/cma/new" class="inline-block bg-primary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition">
+        + تحليل جديد
+    </a>
+</div>
+{% endif %}
+{% endblock %}

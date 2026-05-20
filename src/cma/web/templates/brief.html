@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}CMA - تحليل جديد{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">تحليل جديد</h1>
+        <p class="text-gray-500 text-sm mt-1">أدخل متطلبات العميل لبدء تحليل السوق المقارن</p>
+    </div>
+
+    <form action="/cma/new" method="POST" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">المدينة *</label>
+                <select name="city" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="الرياض">الرياض</option>
+                    <option value="جدة">جدة</option>
+                    <option value="الدمام">الدمام</option>
+                    <option value="الخبر">الخبر</option>
+                    <option value="مكة">مكة المكرمة</option>
+                    <option value="المدينة">المدينة المنورة</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">الحي *</label>
+                <input type="text" name="neighborhood" required placeholder="مثال: العليا"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">نوع الوحدة *</label>
+                <select name="property_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="شقة">شقة</option>
+                    <option value="فيلا">فيلا</option>
+                    <option value="دور">دور</option>
+                    <option value="أرض">أرض</option>
+                    <option value="عمارة">عمارة</option>
+                    <option value="استراحة">استراحة</option>
+                    <option value="محل">محل تجاري</option>
+                    <option value="مكتب">مكتب</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">نوع العرض *</label>
+                <select name="offer_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="إيجار">إيجار</option>
+                    <option value="بيع">بيع</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">الفئة</label>
+                <select name="category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">الكل</option>
+                    <option value="عوائل">عوائل</option>
+                    <option value="أفراد">أفراد</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">غرف النوم</label>
+                <select name="bedrooms" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    <option value="">أي عدد</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6+</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">الحد الأدنى للسعر (ريال)</label>
+                <input type="number" name="min_price" placeholder="0"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">الحد الأعلى للسعر (ريال)</label>
+                <input type="number" name="max_price" placeholder="100000"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">المميزات المطلوبة</label>
+            <div class="flex flex-wrap gap-3">
+                {% for amenity in ["مكيفات", "مصعد", "موقف سيارة", "مسبح", "حارس أمن", "مؤثثة", "مطبخ", "غرفة خادمة", "غرفة غسيل"] %}
+                <label class="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-100 transition text-sm">
+                    <input type="checkbox" name="amenities" value="{{ amenity }}" class="rounded text-primary-500">
+                    {{ amenity }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">ملاحظات إضافية</label>
+            <textarea name="notes" rows="3" placeholder="أي متطلبات أو تفاصيل إضافية..."
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"></textarea>
+        </div>
+
+        <button type="submit"
+            class="w-full bg-primary-500 text-white py-3 rounded-lg font-semibold text-lg hover:bg-primary-700 transition">
+            بدء التحليل
+        </button>
+    </form>
+</div>
+{% endblock %}

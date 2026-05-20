@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}CMA - التقرير{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+    <div>
+        <h1 class="text-xl font-bold text-gray-800">تقرير تحليل السوق المقارن</h1>
+        <p class="text-gray-500 text-sm">{{ brief.property_type }} - {{ brief.neighborhood }}، {{ brief.city }}</p>
+    </div>
+    <div class="flex gap-2">
+        {% if report.report_excel_path %}
+        <a href="/api/cma/{{ report.id }}/excel"
+           class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
+            ⬇ تحميل Excel
+        </a>
+        {% endif %}
+        {% if report.report_pdf_path %}
+        <a href="/api/cma/{{ report.id }}/pdf"
+           class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition">
+            ⬇ تحميل PDF
+        </a>
+        {% endif %}
+        <a href="/" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">
+            ← العودة
+        </a>
+    </div>
+</div>
+
+{% if report.report_html %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <iframe srcdoc="{{ report.report_html | e }}" class="w-full" style="min-height: 900px; border: none;"></iframe>
+</div>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+    <div class="text-gray-400 text-3xl mb-3">📋</div>
+    <p class="text-gray-500">التقرير غير متوفر</p>
+    {% if report.error_message %}
+    <p class="text-red-500 text-sm mt-2">{{ report.error_message }}</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

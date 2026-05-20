@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}CMA - جاري التحليل{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center"
+         hx-get="/cma/{{ report_id }}/status" hx-trigger="every 3s" hx-swap="innerHTML" id="progress-container">
+
+        <div class="mb-6">
+            <div class="text-4xl mb-3">{% if status == 'failed' %}❌{% else %}⏳{% endif %}</div>
+            <h1 class="text-xl font-bold text-gray-800">
+                {% if phase == 2 or status == 'pending_phase2' %}
+                    جاري التحليل العميق للسوق
+                {% else %}
+                    جاري جمع بيانات الإعلانات
+                {% endif %}
+            </h1>
+            <p class="text-gray-500 text-sm mt-1">{{ brief.property_type }} في {{ brief.neighborhood }}، {{ brief.city }}</p>
+        </div>
+
+        <div class="space-y-3 text-right max-w-md mx-auto" id="pipeline-steps">
+
+            {% if phase == 2 or status in ('pending_phase2', 'matching', 'analyzing', 'generating') %}
+            {# Phase 2 steps #}
+            {% set stages = [
+                ("pending_phase2", "بدء التحليل", "⏸️"),
+                ("matching",   "مطابقة العقارات",      "🎯"),
+                ("analyzing",  "حساب المؤشرات",        "📊"),
+                ("generating", "إنشاء تقرير PDF",      "📝"),
+                ("done",       "التقرير جاهز",         "✅"),
+            ] %}
+            {% else %}
+            {# Phase 1 steps #}
+            {% set stages = [
+                ("pending",  "في الانتظار",                "⏸️"),
+                ("scraping", "البحث في المواقع العقارية",  "🔍"),
+                ("cleaning", "استخراج وتنظيف البيانات",    "🧹"),
+                ("scraped",  "جاهز للتحليل",              "✅"),
+            ] %}
+            {% endif %}
+
+            {% set stage_keys = stages | map(attribute=0) | list %}
+            {% set current_idx = stage_keys.index(status) if status in stage_keys else 0 %}
+
+            {% for stage_key, stage_label, stage_icon in stages %}
+                {% set idx = loop.index0 %}
+                {% if idx < current_idx %}
+                <div class="flex items-center gap-3 text-green-600">
+                    <span class="text-lg">✅</span>
+                    <span class="text-sm font-medium">{{ stage_label }}</span>
+                </div>
+                {% elif idx == current_idx and status != 'done' and status != 'failed' %}
+                <div class="flex items-center gap-3 text-blue-600">
+                    <span class="text-lg animate-spin">⚙️</span>
+                    <span class="text-sm font-semibold">{{ stage_label }}...</span>
+                </div>
+                {% elif status == 'done' and stage_key == 'done' %}
+                <div class="flex items-center gap-3 text-green-600">
+                    <span class="text-lg">✅</span>
+                    <span class="text-sm font-bold">{{ stage_label }}</span>
+                </div>
+                {% else %}
+                <div class="flex items-center gap-3 text-gray-300">
+                    <span class="text-lg">{{ stage_icon }}</span>
+                    <span class="text-sm">{{ stage_label }}</span>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        {% if status == 'failed' %}
+        <div class="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 text-right">
+            <div class="text-red-700 font-semibold">حدث خطأ</div>
+            <div class="text-red-600 text-sm mt-1">{{ error or 'خطأ غير معروف' }}</div>
+            <a href="/cma/new" class="inline-block mt-3 bg-red-600 text-white px-4 py-2 rounded-lg text-sm">حاول مرة أخرى</a>
+        </div>
+        {% endif %}
+
+        {% if status == 'done' %}
+        <div class="mt-6 space-y-3">
+            <a href="/cma/{{ report_id }}" class="inline-block bg-primary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition">
+                عرض التقرير
+            </a>
+        </div>
+        {% endif %}
+
+        {% if listings_found and listings_found > 0 %}
+        <div class="mt-4 text-sm text-gray-500">
+            تم العثور على {{ listings_found }} إعلان
+            {% if listings_matched %} | {{ listings_matched }} مطابق{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
