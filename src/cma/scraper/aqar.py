@@ -9,6 +9,7 @@ from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential, retry_
 from cma.config import settings
 from cma.scraper.stealth import (
     apply_stealth,
+    get_random_proxy,
     human_scroll,
     random_delay,
     random_user_agent,
@@ -108,38 +109,40 @@ class AqarScraper:
                 "viewport": viewport,
                 "locale": "ar-SA",
             }
-            if settings.proxy_server:
-                proxy_settings = {"server": settings.proxy_server}
-                if settings.proxy_username and settings.proxy_password:
-                    proxy_settings["username"] = settings.proxy_username
-                    proxy_settings["password"] = settings.proxy_password
+            proxy_settings = get_random_proxy()
+            if proxy_settings:
                 context_kwargs["proxy"] = proxy_settings
-                logger.info(f"Using proxy: {settings.proxy_server}")
+                logger.info(f"Using proxy: {proxy_settings['server']}")
 
             context = await browser.new_context(**context_kwargs)
             await apply_stealth(context)
             page = await context.new_page()
 
             try:
-                logger.info(f"Navigating to {search_url}")
-                async for attempt in AsyncRetrying(
-                    stop=stop_after_attempt(settings.scraper_max_retries),
-                    wait=wait_exponential(multiplier=1, min=2, max=10),
-                    retry=retry_if_exception_type(PlaywrightTimeoutError),
-                    reraise=True
-                ):
-                    with attempt:
-                        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                
-                await random_delay(2, 4)
-
-                page_num = 0
+                page_num = 1
                 seen_urls: set[str] = set()
 
                 while len(results) < self.max_listings:
-                    page_num += 1
-                    logger.info(f"Scraping page {page_num}, {len(results)} listings so far")
+                    current_url = search_url if page_num == 1 else f"{search_url}/{page_num}"
+                    logger.info(f"Scraping page {page_num} ({current_url}), {len(results)} listings so far")
 
+                    async for attempt in AsyncRetrying(
+                        stop=stop_after_attempt(settings.scraper_max_retries),
+                        wait=wait_exponential(multiplier=1, min=2, max=10),
+                        retry=retry_if_exception_type(PlaywrightTimeoutError),
+                        reraise=True
+                    ):
+                        with attempt:
+                            await page.goto(current_url, wait_until="domcontentloaded", timeout=30000)
+                            title = await page.title()
+                            if "Just a moment" in title or "Cloudflare" in title:
+                                logger.warning("Cloudflare challenge detected, waiting...")
+                                await asyncio.sleep(5)
+                                title = await page.title()
+                                if "Just a moment" in title or "Cloudflare" in title:
+                                    raise PlaywrightTimeoutError("Blocked by Cloudflare")
+                    
+                    await random_delay(2, 4)
                     await human_scroll(page, scrolls=4)
                     await random_delay(1, 3)
 
@@ -158,7 +161,7 @@ class AqarScraper:
                             seen_urls.add(href)
 
                     if not listing_hrefs:
-                        logger.warning("No listing links found on page — stopping.")
+                        logger.warning("No new listing links found on page — stopping pagination.")
                         break
 
                     logger.info(f"Found {len(listing_hrefs)} new listing links on page {page_num}")
@@ -174,19 +177,8 @@ class AqarScraper:
                         except Exception as e:
                             logger.warning(f"Failed to process listing {href}: {e}")
 
-                    # Try to go to the next page
-                    next_btn = await page.query_selector(
-                        "a[rel='next'], "
-                        "a[aria-label='Next'], button[aria-label='Next'], "
-                        "[class*='pagination'] a:last-child, [class*='next']"
-                    )
-                    if next_btn:
-                        await next_btn.click()
-                        await random_delay(2, 5)
-                        await page.wait_for_load_state("domcontentloaded")
-                    else:
-                        logger.info("No next page button found — stopping.")
-                        break
+                    # Increment page for the next iteration
+                    page_num += 1
 
             except Exception as e:
                 logger.error(f"Scraping failed: {e}")
