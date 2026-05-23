@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}قاعدة العقارات المجلوبة{% endblock %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">قاعدة بيانات العقارات</h1>
+            <p class="text-gray-500 text-sm mt-1">عرض وتحليل العقارات المخزنة محلياً من مصادر متعددة.</p>
+        </div>
+        <div class="bg-blue-50 text-blue-700 px-4 py-2.5 rounded-xl border border-blue-100 font-semibold text-sm flex items-center gap-2">
+            📊 إجمالي العقارات: <span class="font-bold text-base">{{ total_count }}</span>
+        </div>
+    </div>
+
+    <!-- Filters Bar -->
+    <form method="GET" action="/listings" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+        <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">المصدر</label>
+            <select name="source" class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">الكل</option>
+                <option value="Aqar.fm" {% if filters.source == 'Aqar.fm' %}selected{% endif %}>Aqar.fm</option>
+                <option value="Bayut.sa" {% if filters.source == 'Bayut.sa' %}selected{% endif %}>Bayut.sa</option>
+                <option value="DealApp.sa" {% if filters.source == 'DealApp.sa' %}selected{% endif %}>DealApp.sa</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">المدينة</label>
+            <select name="city" class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">الكل</option>
+                <option value="الرياض" {% if filters.city == 'الرياض' %}selected{% endif %}>الرياض</option>
+                <option value="جدة" {% if filters.city == 'جدة' %}selected{% endif %}>جدة</option>
+                <option value="الدمام" {% if filters.city == 'الدمام' %}selected{% endif %}>الدمام</option>
+                <option value="الخبر" {% if filters.city == 'الخبر' %}selected{% endif %}>الخبر</option>
+                <option value="مكة" {% if filters.city == 'مكة' %}selected{% endif %}>مكة المكرمة</option>
+                <option value="المدينة" {% if filters.city == 'المدينة' %}selected{% endif %}>المدينة المنورة</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">الحي</label>
+            <input type="text" name="neighborhood" value="{{ filters.neighborhood or '' }}" placeholder="ابحث عن حي..."
+                class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">نوع الوحدة</label>
+            <select name="property_type" class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">الكل</option>
+                <option value="شقة" {% if filters.property_type == 'شقة' %}selected{% endif %}>شقة</option>
+                <option value="فيلا" {% if filters.property_type == 'فيلا' %}selected{% endif %}>فيلا</option>
+                <option value="دور" {% if filters.property_type == 'دور' %}selected{% endif %}>دور</option>
+                <option value="أرض" {% if filters.property_type == 'أرض' %}selected{% endif %}>أرض</option>
+                <option value="عمارة" {% if filters.property_type == 'عمارة' %}selected{% endif %}>عمارة</option>
+                <option value="مكتب" {% if filters.property_type == 'مكتب' %}selected{% endif %}>مكتب</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">نوع العرض</label>
+            <select name="offer_type" class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">الكل</option>
+                <option value="إيجار" {% if filters.offer_type == 'إيجار' %}selected{% endif %}>إيجار</option>
+                <option value="بيع" {% if filters.offer_type == 'بيع' %}selected{% endif %}>بيع</option>
+            </select>
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition">
+                فلترة
+            </button>
+            <a href="/listings" class="flex-1 text-center bg-gray-100 text-gray-700 text-xs font-bold py-2 rounded-lg hover:bg-gray-200 transition">
+                إعادة تعيين
+            </a>
+        </div>
+    </form>
+
+    <!-- Listings Table -->
+    {% if listings %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100 text-gray-400 text-xs font-bold">
+                        <th class="p-4">المصدر</th>
+                        <th class="p-4">العنوان</th>
+                        <th class="p-4">المدينة / الحي</th>
+                        <th class="p-4">النوع / العرض</th>
+                        <th class="p-4">السعر (ريال)</th>
+                        <th class="p-4">المساحة / الغرف</th>
+                        <th class="p-4">المميزات</th>
+                        <th class="p-4 text-center">رابط الإعلان</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 text-sm text-gray-700">
+                    {% for item in listings %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <!-- Source -->
+                        <td class="p-4">
+                            {% set src = item.structured_data.get('المصدر', 'Aqar.fm') %}
+                            {% if src == 'Bayut.sa' %}
+                                <span class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded text-xs font-bold">Bayut.sa</span>
+                            {% elif src == 'DealApp.sa' %}
+                                <span class="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded text-xs font-bold">DealApp.sa</span>
+                            {% else %}
+                                <span class="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded text-xs font-bold">Aqar.fm</span>
+                            {% endif %}
+                        </td>
+                        <!-- Title -->
+                        <td class="p-4 font-semibold text-gray-800">
+                            {{ item.structured_data.get('العنوان', 'عقار بدون عنوان') }}
+                        </td>
+                        <!-- City/Neighborhood -->
+                        <td class="p-4">
+                            {{ item.structured_data.get('المدينة', '-') }}، {{ item.structured_data.get('الحي', '-') }}
+                        </td>
+                        <!-- Type/Offer -->
+                        <td class="p-4">
+                            {{ item.structured_data.get('نوع_الوحدة', '-') }} ({{ item.structured_data.get('نوع_العرض', '-') }})
+                        </td>
+                        <!-- Price -->
+                        <td class="p-4 font-bold text-gray-900">
+                            {% if item.structured_data.get('السعر') %}
+                                {{ "{:,.0f}".format(item.structured_data.get('السعر')) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <!-- Size/Rooms -->
+                        <td class="p-4 text-xs text-gray-500">
+                            {% if item.structured_data.get('المساحة_متر') %}
+                                {{ item.structured_data.get('المساحة_متر') }} م²
+                            {% endif %}
+                            {% if item.structured_data.get('غرف_النوم') %}
+                                 | {{ item.structured_data.get('غرف_النوم') }} غرف
+                            {% endif %}
+                        </td>
+                        <!-- Amenities -->
+                        <td class="p-4 text-xs max-w-xs truncate text-gray-400">
+                            {{ item.structured_data.get('المميزات', []) | join('، ') }}
+                        </td>
+                        <!-- Source Link -->
+                        <td class="p-4 text-center">
+                            <a href="{{ item.source_url }}" target="_blank" class="inline-block bg-blue-50 text-blue-600 border border-blue-100 rounded-lg p-1.5 hover:bg-blue-100 transition">
+                                🔗 عرض المصدر
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
+        <div class="text-gray-300 text-6xl mb-4">📂</div>
+        <h3 class="text-xl font-bold text-gray-700">قاعدة البيانات فارغة</h3>
+        <p class="text-gray-500 text-sm mt-2 mb-6">لا توجد عقارات مسجلة في النظام تطابق شروط الفلترة المحددة.</p>
+        <a href="/scraper" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition">
+            🚀 اذهب لجلب البيانات
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

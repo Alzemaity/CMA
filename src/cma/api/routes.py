@@ -1,4 +1,3 @@
-import asyncio
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -93,12 +92,12 @@ async def create_cma(
     db.add(brief)
     await db.flush()
 
-    report = CMAReport(brief_id=brief.id, status="pending", phase=1)
+    report = CMAReport(brief_id=brief.id, status="pending", phase=2)
     db.add(report)
     await db.commit()
     await db.refresh(report)
 
-    background_tasks.add_task(_run_phase1, report.id)
+    background_tasks.add_task(_run_phase2, report.id)
 
     return report
 

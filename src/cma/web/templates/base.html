@@ -31,10 +31,21 @@
 <body class="bg-gray-50 min-h-screen" dir="rtl">
     <nav class="bg-primary-600 text-white shadow-lg">
         <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" class="text-xl font-bold">CMA <span class="text-sm font-light opacity-80">تحليل السوق المقارن</span></a>
-            <a href="/cma/new" class="bg-white text-primary-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-100 transition">
-                + تحليل جديد
-            </a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-xl font-bold">CMA <span class="text-sm font-light opacity-80">تحليل السوق المقارن</span></a>
+                <div class="hidden md:flex items-center gap-4 text-sm font-medium">
+                    <a href="/" class="hover:text-blue-200 transition">الرئيسية</a>
+                    <a href="/listings" class="hover:text-blue-200 transition">قاعدة العقارات</a>
+                    <a href="/scraper" class="hover:text-blue-200 transition">جلب البيانات</a>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="/listings" class="md:hidden text-xs bg-primary-700 px-2 py-1.5 rounded text-white font-medium hover:bg-primary-800 transition">العقارات</a>
+                <a href="/scraper" class="md:hidden text-xs bg-primary-700 px-2 py-1.5 rounded text-white font-medium hover:bg-primary-800 transition">الجلب</a>
+                <a href="/cma/new" class="bg-white text-primary-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-100 transition">
+                    + تحليل جديد
+                </a>
+            </div>
         </div>
     </nav>
     <main class="max-w-6xl mx-auto px-4 py-6">

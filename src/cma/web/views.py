@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from cma.database import get_db
-from cma.models import CMAReport, ClientBrief
+from cma.models import CMAReport, ClientBrief, Listing
 import pathlib
+import datetime
 from fastapi.templating import Jinja2Templates
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
@@ -66,13 +67,13 @@ async def create_cma(
     db.add(brief)
     await db.flush()
 
-    report = CMAReport(brief_id=brief.id, status="pending", phase=1)
+    report = CMAReport(brief_id=brief.id, status="pending", phase=2)
     db.add(report)
     await db.commit()
     await db.refresh(report)
 
-    from cma.api.routes import _run_phase1
-    background_tasks.add_task(_run_phase1, report.id)
+    from cma.api.routes import _run_phase2
+    background_tasks.add_task(_run_phase2, report.id)
 
     return RedirectResponse(url=f"/cma/{report.id}/progress", status_code=303)
 
@@ -187,4 +188,129 @@ async def view_report(
     return templates.TemplateResponse(request, "report.html", {
         "report": report,
         "brief": brief,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Decoupled Scraping & Listings view routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _run_general_scrape_task(
+    source: str,
+    city: str,
+    neighborhood: str,
+    property_type: str,
+    offer_type: str,
+    limit: int,
+    bedrooms: int | None,
+):
+    from cma.database import async_session
+    from cma.pipeline.orchestrator import CMAOrchestrator
+    
+    async with async_session() as db:
+        orchestrator = CMAOrchestrator(db)
+        if hasattr(orchestrator.scraper, "max_listings"):
+            orchestrator.scraper.max_listings = limit
+        await orchestrator.run_general_scrape(
+            source=source,
+            city=city,
+            neighborhood=neighborhood,
+            property_type=property_type,
+            offer_type=offer_type,
+            bedrooms=bedrooms,
+        )
+
+
+@router.get("/scraper", response_class=HTMLResponse)
+async def scraper_form(request: Request, success: str = ""):
+    return templates.TemplateResponse(
+        request, "scraper.html", {"success_msg": success}
+    )
+
+
+@router.post("/scraper")
+async def start_scraper(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    source: str = Form(...),
+    city: str = Form(...),
+    neighborhood: str = Form(...),
+    property_type: str = Form(...),
+    offer_type: str = Form(...),
+    limit: str = Form("20"),
+    bedrooms: str = Form(""),
+):
+    background_tasks.add_task(
+        _run_general_scrape_task,
+        source=source,
+        city=city,
+        neighborhood=neighborhood,
+        property_type=property_type,
+        offer_type=offer_type,
+        limit=int(limit) if limit else 20,
+        bedrooms=int(bedrooms) if bedrooms else None,
+    )
+    
+    # Redirect to scraper page with a success query param
+    success_msg = f"تم بدء جلب البيانات من {source} لحي {neighborhood} بمدينة {city} في الخلفية بنجاح."
+    return RedirectResponse(
+        url=f"/scraper?success={success_msg}",
+        status_code=303,
+    )
+
+
+@router.get("/listings", response_class=HTMLResponse)
+async def view_listings_db(
+    request: Request,
+    source: str = "",
+    city: str = "",
+    neighborhood: str = "",
+    property_type: str = "",
+    offer_type: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(Listing)
+    result = await db.execute(stmt)
+    db_listings = result.scalars().all()
+    
+    # Filter listings in Python for cross-DB compatibility (SQLite & Postgres)
+    filtered = []
+    for db_listing in db_listings:
+        if not db_listing.structured_data:
+            continue
+            
+        data = db_listing.structured_data
+        
+        # Apply filters
+        if source and data.get("المصدر") != source:
+            continue
+        if city and data.get("المدينة") != city:
+            continue
+        if neighborhood and neighborhood not in (data.get("الحي") or ""):
+            continue
+        if property_type and data.get("نوع_الوحدة") != property_type:
+            continue
+        if offer_type and data.get("نوع_العرض") != offer_type:
+            continue
+            
+        filtered.append(db_listing)
+        
+    total_count = len(filtered)
+    
+    # Sort by scraped_at descending
+    filtered.sort(key=lambda x: x.scraped_at or datetime.datetime.min, reverse=True)
+    
+    # Limit displayed items to 100 for web responsiveness
+    display_listings = filtered[:100]
+    
+    return templates.TemplateResponse(request, "listings.html", {
+        "listings": display_listings,
+        "total_count": total_count,
+        "filters": {
+            "source": source,
+            "city": city,
+            "neighborhood": neighborhood,
+            "property_type": property_type,
+            "offer_type": offer_type,
+        }
     })

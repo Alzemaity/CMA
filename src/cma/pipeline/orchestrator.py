@@ -13,6 +13,8 @@ from cma.pipeline.matcher import PropertyMatcher
 from cma.report.excel_exporter import ExcelExporter
 from cma.report.generator import ReportGenerator
 from cma.scraper.aqar import AqarScraper
+from cma.scraper.bayut import BayutScraper
+from cma.scraper.dealapp import DealAppScraper
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +124,97 @@ class CMAOrchestrator:
     # PHASE 2: Match, Analyse, Narrate → PDF report
     # ─────────────────────────────────────────────────────────────────────────
 
+    async def run_general_scrape(
+        self,
+        source: str,
+        city: str,
+        neighborhood: str,
+        property_type: str,
+        offer_type: str,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        bedrooms: int | None = None,
+        category: str | None = None,
+    ) -> int:
+        """
+        Runs a general scraping run for a specific source and inputs,
+        persisting all found and structured listings to the database.
+        Returns the number of listings successfully stored.
+        """
+        logger.info(f"Starting general scrape from source: {source} for {city} - {neighborhood}")
+        
+        # 1. Select scraper
+        if "bayut" in source.lower():
+            scraper = BayutScraper()
+            source_label = "Bayut.sa"
+        elif "deal" in source.lower():
+            scraper = DealAppScraper()
+            source_label = "DealApp.sa"
+        else:
+            scraper = AqarScraper()
+            source_label = "Aqar.fm"
+            
+        # 2. Run scraper
+        scraped = await scraper.scrape(
+            city=city,
+            neighborhood=neighborhood,
+            property_type=property_type,
+            offer_type=offer_type,
+            min_price=min_price,
+            max_price=max_price,
+            bedrooms=bedrooms,
+            category=category,
+        )
+        
+        if not scraped:
+            logger.info("No listings found during scraping run.")
+            return 0
+            
+        # 3. Extract structured data via AI
+        extraction_input = [(item.raw_html, item.url) for item in scraped]
+        structured = await self.extractor.extract_batch(extraction_input)
+        
+        if not structured:
+            logger.warning("Failed to extract structured data from scraped listings.")
+            return 0
+            
+        # 4. Clean & deduplicate
+        cleaned = self.cleaner.clean(structured)
+        
+        # 5. Persist listings to DB, adding source label
+        saved_count = 0
+        for item in cleaned:
+            url = item.get("رابط_الإعلان", "")
+            if not url:
+                continue
+            
+            # Inject source label
+            item["المصدر"] = source_label
+            
+            existing = await self.db.execute(
+                select(Listing).where(Listing.source_url == url)
+            )
+            listing = existing.scalar_one_or_none()
+            if not listing:
+                listing = Listing(
+                    source_url=url,
+                    structured_data=item,
+                    trust_score=item.get("trust_score", 0),
+                )
+                self.db.add(listing)
+                saved_count += 1
+            else:
+                listing.structured_data = item
+                listing.trust_score = item.get("trust_score", 0)
+                
+        await self.db.commit()
+        logger.info(f"General scrape complete: stored/updated {saved_count} new listings in DB from {source_label}.")
+        return saved_count
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # PHASE 2: Match, Analyse, Narrate → PDF report
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def run_phase2(self, report_id: int) -> CMAReport:
         report = await self.db.get(CMAReport, report_id)
         if not report:
@@ -131,10 +224,43 @@ class CMAOrchestrator:
         if not brief:
             raise ValueError(f"Brief {report.brief_id} not found")
 
-        # Load cached cleaned data from phase 1
-        cleaned = report.scraped_data
+        # Load all structured listings from the database
+        stmt = select(Listing)
+        result = await self.db.execute(stmt)
+        listings_in_db = result.scalars().all()
+        
+        cleaned = []
+        for db_listing in listings_in_db:
+            if db_listing.structured_data:
+                item = dict(db_listing.structured_data)
+                # Ensure trust_score and source url are present in the dictionary
+                item["trust_score"] = db_listing.trust_score
+                item["رابط_الإعلان"] = db_listing.source_url
+                cleaned.append(item)
+
         if not cleaned:
-            await self._update_status(report, "failed", "لا توجد بيانات من المرحلة الأولى")
+            await self._update_status(
+                report, "failed", 
+                "لا توجد عقارات في قاعدة البيانات. يرجى الذهاب لصفحة جلب البيانات وكشط بعض العقارات أولاً."
+            )
+            return report
+
+        # Filter listings matching the brief's basic criteria to set listings_found
+        basic_matches = [
+            item for item in cleaned
+            if item.get("المدينة") == brief.city
+            and item.get("نوع_الوحدة") == brief.property_type
+            and item.get("نوع_العرض") == brief.offer_type
+        ]
+        
+        report.listings_found = len(basic_matches)
+        await self.db.commit()
+
+        if not basic_matches:
+            await self._update_status(
+                report, "failed", 
+                f"لا توجد عقارات في قاعدة البيانات تطابق {brief.city} - {brief.property_type} - {brief.offer_type}. يرجى جلب عقارات مطابقة أولاً."
+            )
             return report
 
         try:
@@ -157,7 +283,7 @@ class CMAOrchestrator:
 
             if not matched:
                 await self._update_status(
-                    report, "failed", "لم يتم العثور على عقارات مطابقة للمعايير"
+                    report, "failed", "لم يتم العثور على عقارات مطابقة لمعايير الحي والتفاصيل الأخرى"
                 )
                 return report
 
@@ -190,6 +316,7 @@ class CMAOrchestrator:
             report.report_html = html
             report.report_pdf_path = pdf_path
             report.kpis = kpis
+            report.scraped_data = basic_matches  # Cache candidate listings for compatibility
             report.phase = 2
 
             # Link report listings
@@ -208,13 +335,21 @@ class CMAOrchestrator:
                     )
                     self.db.add(rl)
 
+            # Step 5 - Export Excel
+            excel_path = self.excel_exporter.export(
+                listings=basic_matches,
+                city=brief.city,
+                neighborhood=brief.neighborhood,
+                report_id=report.id,
+            )
+            report.report_excel_path = excel_path
+
             await self._update_status(report, "done")
             report.completed_at = datetime.datetime.now(datetime.UTC)
             await self.db.commit()
 
             logger.info(
-                f"Phase 2 complete: report={report.id}, "
-                f"matched={report.listings_matched}"
+                f"Phase 2 complete: report={report.id}, matched={report.listings_matched}"
             )
             return report
 
