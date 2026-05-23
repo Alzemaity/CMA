@@ -17,5 +17,15 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
+    @property
+    def get_database_url(self) -> str:
+        # Render sometimes provides postgres:// which SQLAlchemy 2.0+ doesn't like,
+        # and we also need to use the asyncpg driver
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
 settings = Settings()
