@@ -204,21 +204,31 @@ async def _run_general_scrape_task(
     limit: int,
     bedrooms: int | None,
 ):
-    from cma.database import async_session
-    from cma.pipeline.orchestrator import CMAOrchestrator
-    
-    async with async_session() as db:
-        orchestrator = CMAOrchestrator(db)
-        if hasattr(orchestrator.scraper, "max_listings"):
-            orchestrator.scraper.max_listings = limit
-        await orchestrator.run_general_scrape(
-            source=source,
-            city=city,
-            neighborhood=neighborhood,
-            property_type=property_type,
-            offer_type=offer_type,
-            bedrooms=bedrooms,
-        )
+    import logging
+    _logger = logging.getLogger("cma.scrape_task")
+    _logger.info(
+        f"[BG Task] Starting scrape | source={source} city={city} "
+        f"neighborhood={neighborhood} property_type={property_type} "
+        f"offer_type={offer_type} limit={limit}"
+    )
+    try:
+        from cma.database import async_session
+        from cma.pipeline.orchestrator import CMAOrchestrator
+
+        async with async_session() as db:
+            orchestrator = CMAOrchestrator(db)
+            count = await orchestrator.run_general_scrape(
+                source=source,
+                city=city,
+                neighborhood=neighborhood,
+                property_type=property_type,
+                offer_type=offer_type,
+                limit=limit,
+                bedrooms=bedrooms,
+            )
+            _logger.info(f"[BG Task] Scrape finished: {count} new listings saved.")
+    except Exception as exc:
+        _logger.exception(f"[BG Task] Scrape failed with unhandled exception: {exc}")
 
 
 @router.get("/scraper", response_class=HTMLResponse)

@@ -61,44 +61,71 @@ class ListingExtractor:
     async def extract(self, raw_html: str, listing_url: str) -> dict | None:
         content = self._clean_html(raw_html)
         if not content:
+            logger.warning(f"Empty cleaned content for {listing_url}")
             return None
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                max_tokens=2000,
-                messages=[
-                    {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"استخرج بيانات هذا الإعلان العقاري.\n"
-                            f"الرابط: {listing_url}\n\n"
-                            f"محتوى الصفحة:\n{content[:6000]}"
-                        ),
-                    },
-                ],
-            )
+        for attempt in range(2):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    max_tokens=2000,
+                    messages=[
+                        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"استخرج بيانات هذا الإعلان العقاري.\n"
+                                f"الرابط: {listing_url}\n\n"
+                                f"محتوى الصفحة:\n{content[:6000]}"
+                            ),
+                        },
+                    ],
+                )
 
-            text = response.choices[0].message.content.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-                text = text.rsplit("```", 1)[0]
+                text = response.choices[0].message.content
+                if not text:
+                    logger.warning(
+                        f"[Extractor] Empty response from model for {listing_url} "
+                        f"(attempt {attempt + 1}/2)"
+                    )
+                    continue
 
-            data = json.loads(text)
-            data["رابط_الإعلان"] = listing_url
+                text = text.strip()
 
-            if data.get("السعر") and data.get("المساحة_متر"):
-                data["السعر_للمتر"] = round(data["السعر"] / data["المساحة_متر"], 2)
+                # Strip markdown code fences if present
+                if "```" in text:
+                    # Extract content between first ``` and last ```
+                    parts = text.split("```")
+                    for part in parts:
+                        part = part.strip()
+                        if part.startswith("json"):
+                            part = part[4:].strip()
+                        if part.startswith("{"):
+                            text = part
+                            break
 
-            return data
+                data = json.loads(text)
+                data["رابط_الإعلان"] = listing_url
 
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse JSON from model response for {listing_url}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"OpenRouter API error for {listing_url}: {e}")
-            return None
+                if data.get("السعر") and data.get("المساحة_متر"):
+                    data["السعر_للمتر"] = round(data["السعر"] / data["المساحة_متر"], 2)
+
+                return data
+
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"[Extractor] JSON parse failed for {listing_url} "
+                    f"(attempt {attempt + 1}/2): {e}"
+                )
+                if attempt == 0:
+                    await asyncio.sleep(1)
+                continue
+            except Exception as e:
+                logger.error(f"[Extractor] API error for {listing_url}: {e}")
+                return None
+
+        logger.error(f"[Extractor] All attempts exhausted for {listing_url}")
+        return None
 
     async def extract_batch(
         self, listings: list[tuple[str, str]], concurrency: int = 5

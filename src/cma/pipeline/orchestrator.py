@@ -131,19 +131,23 @@ class CMAOrchestrator:
         neighborhood: str,
         property_type: str,
         offer_type: str,
+        limit: int = 20,
         min_price: float | None = None,
         max_price: float | None = None,
         bedrooms: int | None = None,
         category: str | None = None,
     ) -> int:
         """
-        Runs a general scraping run for a specific source and inputs,
-        persisting all found and structured listings to the database.
-        Returns the number of listings successfully stored.
+        Runs a general scraping run for a specific source and criteria,
+        persisting all found listings to the database.
+        Returns the number of listings stored.
         """
-        logger.info(f"Starting general scrape from source: {source} for {city} - {neighborhood}")
-        
-        # 1. Select scraper
+        logger.info(
+            f"Starting general scrape from source={source!r} "
+            f"city={city} neighborhood={neighborhood} limit={limit}"
+        )
+
+        # 1. Select scraper and apply limit
         if "bayut" in source.lower():
             scraper = BayutScraper()
             source_label = "Bayut.sa"
@@ -153,6 +157,10 @@ class CMAOrchestrator:
         else:
             scraper = AqarScraper()
             source_label = "Aqar.fm"
+
+        # Apply user-specified limit to the chosen scraper
+        scraper.max_listings = limit
+        logger.info(f"Using scraper={source_label} max_listings={limit}")
             
         # 2. Run scraper
         scraped = await scraper.scrape(
