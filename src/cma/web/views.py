@@ -291,7 +291,7 @@ async def scraper_status(
     job = await db.get(ScrapeJob, job_id)
     if not job:
         return HTMLResponse("المهمة غير موجودة", status_code=404)
-    return templates.TemplateResponse(request, "scraper_progress.html", {"job": job})
+    return templates.TemplateResponse(request, "scraper_status_partial.html", {"job": job})
 
 
 @router.get("/scraper/{job_id}/excel")

@@ -1,0 +1,146 @@
+<div id="job-status-container"
+     {% if job.status not in ('done', 'failed') %}
+     hx-get="/scraper/{{ job.id }}/status"
+     hx-trigger="every 4s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+            {% if job.status == 'done' %}✅ اكتمل جلب البيانات
+            {% elif job.status == 'failed' %}❌ فشل جلب البيانات
+            {% else %}⏳ جاري جلب البيانات
+            {% endif %}
+        </h1>
+        <p class="text-gray-500 text-sm mt-1">
+            {{ job.source_label or job.source }} ←
+            {{ job.property_type }} ({{ job.offer_type }}) ←
+            {{ job.neighborhood }}، {{ job.city }}
+        </p>
+    </div>
+
+    <!-- Progress card -->
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 relative overflow-hidden">
+        <!-- Top gradient bar -->
+        <div class="absolute top-0 left-0 right-0 h-1.5
+            {% if job.status == 'done' %}bg-gradient-to-r from-emerald-400 to-green-500
+            {% elif job.status == 'failed' %}bg-gradient-to-r from-red-400 to-rose-500
+            {% else %}bg-gradient-to-r from-blue-500 to-indigo-600{% endif %}">
+        </div>
+
+        <!-- Steps -->
+        <div class="space-y-3 mt-2">
+            {% set steps = [
+                ('pending',    '⏸️', 'في الانتظار', 'جاري تهيئة عملية الجلب...'),
+                ('scraping',   '🔍', 'البحث في الموقع', 'جاري تصفح الإعلانات وجمع الروابط...'),
+                ('extracting', '🤖', 'استخراج البيانات', 'الذكاء الاصطناعي يحلل كل إعلان...'),
+                ('saving',     '💾', 'حفظ في قاعدة البيانات', 'جاري تخزين الإعلانات...'),
+                ('done',       '✅', 'اكتمل', 'تم جلب البيانات بنجاح'),
+            ] %}
+
+            {% set step_keys = steps | map(attribute=0) | list %}
+            {% set current_idx = step_keys.index(job.status) if job.status in step_keys else 0 %}
+
+            {% for step_key, icon, label, desc in steps %}
+                {% set idx = loop.index0 %}
+                {% if job.status == 'failed' and step_key != 'done' and idx <= current_idx %}
+                <div class="flex items-center gap-4 p-3 rounded-xl bg-red-50 border border-red-100">
+                    <span class="text-xl w-8 text-center">❌</span>
+                    <div>
+                        <div class="text-sm font-bold text-red-700">{{ label }}</div>
+                        <div class="text-xs text-red-500 mt-0.5">{{ job.error_message or 'حدث خطأ غير متوقع' }}</div>
+                    </div>
+                </div>
+                {% elif idx < current_idx or (job.status == 'done' and step_key == 'done') %}
+                <!-- Done step -->
+                <div class="flex items-center gap-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <span class="text-xl w-8 text-center">✅</span>
+                    <div>
+                        <div class="text-sm font-semibold text-emerald-700">{{ label }}</div>
+                    </div>
+                </div>
+                {% elif idx == current_idx and job.status not in ('done', 'failed') %}
+                <!-- Active step -->
+                <div class="flex items-center gap-4 p-3 rounded-xl bg-blue-50 border border-blue-200 ring-2 ring-blue-300 ring-offset-1">
+                    <span class="text-xl w-8 text-center animate-spin">⚙️</span>
+                    <div>
+                        <div class="text-sm font-bold text-blue-700">{{ label }}...</div>
+                        <div class="text-xs text-blue-500 mt-0.5">{{ desc }}</div>
+                        {% if step_key == 'scraping' %}
+                        <div class="text-xs text-blue-400 mt-0.5">الهدف: {{ job.limit }} إعلان</div>
+                        {% elif step_key == 'extracting' and job.listings_scraped > 0 %}
+                        <div class="text-xs text-blue-400 mt-0.5">تم جمع {{ job.listings_scraped }} إعلان</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <!-- Pending step -->
+                <div class="flex items-center gap-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <span class="text-xl w-8 text-center opacity-30">{{ icon }}</span>
+                    <div class="text-sm text-gray-400">{{ label }}</div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Done result section -->
+        {% if job.status == 'done' %}
+        <div class="mt-6 p-5 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl">🎉</span>
+                <div>
+                    <div class="font-bold text-emerald-800 text-lg">تم جلب البيانات بنجاح!</div>
+                    <div class="text-sm text-emerald-600 mt-0.5">
+                        {% if job.listings_scraped > 0 %}
+                        تم جمع <strong>{{ job.listings_scraped }}</strong> إعلان وحفظ
+                        <strong>{{ job.listings_saved }}</strong> جديد في قاعدة البيانات
+                        {% else %}
+                        لم يتم العثور على إعلانات مطابقة للمعايير المحددة
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+                <a href="/listings?city={{ job.city }}&source={{ job.source_label or '' }}"
+                   class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition flex items-center gap-2">
+                    🏠 عرض العقارات في قاعدة البيانات
+                </a>
+                {% if job.excel_path %}
+                <a href="/scraper/{{ job.id }}/excel"
+                   class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition flex items-center gap-2">
+                    ⬇ تحميل ملف Excel
+                </a>
+                {% endif %}
+                <a href="/scraper"
+                   class="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-200 transition flex items-center gap-2">
+                    🔄 جلب مزيد من البيانات
+                </a>
+                <a href="/cma/new"
+                   class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition flex items-center gap-2">
+                    📊 إنشاء تقرير CMA جديد
+                </a>
+            </div>
+        </div>
+        {% elif job.status == 'failed' %}
+        <div class="mt-6 p-5 bg-red-50 border border-red-200 rounded-xl">
+            <div class="font-bold text-red-700 mb-2">حدث خطأ أثناء عملية الجلب</div>
+            <div class="text-sm text-red-600 mb-4">{{ job.error_message or 'خطأ غير معروف' }}</div>
+            <a href="/scraper" class="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition">
+                🔄 حاول مرة أخرى
+            </a>
+        </div>
+        {% else %}
+        <!-- Still running indicator -->
+        <div class="mt-6 text-center text-sm text-gray-400">
+            <div class="inline-flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                يتم التحديث تلقائياً كل 4 ثوانٍ...
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
