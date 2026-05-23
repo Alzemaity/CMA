@@ -82,3 +82,27 @@ class ReportListing(Base):
 
     report: Mapped["CMAReport"] = relationship(back_populates="report_listings")
     listing: Mapped["Listing"] = relationship(back_populates="report_listings")
+
+
+class ScrapeJob(Base):
+    __tablename__ = "scrape_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(30), default="pending")  # pending|scraping|extracting|saving|done|failed
+    source: Mapped[str] = mapped_column(String(50))
+    source_label: Mapped[str] = mapped_column(String(50), default="")
+    city: Mapped[str] = mapped_column(String(100))
+    neighborhood: Mapped[str] = mapped_column(String(100))
+    property_type: Mapped[str] = mapped_column(String(50))
+    offer_type: Mapped[str] = mapped_column(String(20))
+    limit: Mapped[int] = mapped_column(Integer, default=20)
+    listings_scraped: Mapped[int] = mapped_column(Integer, default=0)
+    listings_saved: Mapped[int] = mapped_column(Integer, default=0)
+    excel_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+    completed_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime, nullable=True
+    )

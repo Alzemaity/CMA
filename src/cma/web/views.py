@@ -1,11 +1,11 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from cma.database import get_db
-from cma.models import CMAReport, ClientBrief, Listing
+from cma.models import CMAReport, ClientBrief, Listing, ScrapeJob
 import pathlib
 import datetime
 from fastapi.templating import Jinja2Templates
@@ -195,47 +195,48 @@ async def view_report(
 # Decoupled Scraping & Listings view routes
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _run_general_scrape_task(
-    source: str,
-    city: str,
-    neighborhood: str,
-    property_type: str,
-    offer_type: str,
-    limit: int,
-    bedrooms: int | None,
-):
+async def _run_general_scrape_task(job_id: int):
     import logging
     _logger = logging.getLogger("cma.scrape_task")
-    _logger.info(
-        f"[BG Task] Starting scrape | source={source} city={city} "
-        f"neighborhood={neighborhood} property_type={property_type} "
-        f"offer_type={offer_type} limit={limit}"
-    )
+    _logger.info(f"[BG Task] Starting scrape for job_id={job_id}")
     try:
         from cma.database import async_session
         from cma.pipeline.orchestrator import CMAOrchestrator
 
         async with async_session() as db:
+            job = await db.get(ScrapeJob, job_id)
+            if not job:
+                _logger.error(f"[BG Task] ScrapeJob {job_id} not found")
+                return
+
             orchestrator = CMAOrchestrator(db)
             count = await orchestrator.run_general_scrape(
-                source=source,
-                city=city,
-                neighborhood=neighborhood,
-                property_type=property_type,
-                offer_type=offer_type,
-                limit=limit,
-                bedrooms=bedrooms,
+                source=job.source,
+                city=job.city,
+                neighborhood=job.neighborhood,
+                property_type=job.property_type,
+                offer_type=job.offer_type,
+                limit=job.limit,
+                job_id=job_id,
             )
-            _logger.info(f"[BG Task] Scrape finished: {count} new listings saved.")
+            _logger.info(f"[BG Task] Job {job_id} finished: {count} listings saved.")
     except Exception as exc:
-        _logger.exception(f"[BG Task] Scrape failed with unhandled exception: {exc}")
+        _logger.exception(f"[BG Task] Job {job_id} failed: {exc}")
+        try:
+            from cma.database import async_session
+            async with async_session() as db:
+                job = await db.get(ScrapeJob, job_id)
+                if job:
+                    job.status = "failed"
+                    job.error_message = str(exc)
+                    await db.commit()
+        except Exception:
+            pass
 
 
 @router.get("/scraper", response_class=HTMLResponse)
-async def scraper_form(request: Request, success: str = ""):
-    return templates.TemplateResponse(
-        request, "scraper.html", {"success_msg": success}
-    )
+async def scraper_form(request: Request):
+    return templates.TemplateResponse(request, "scraper.html", {})
 
 
 @router.post("/scraper")
@@ -249,23 +250,65 @@ async def start_scraper(
     offer_type: str = Form(...),
     limit: str = Form("20"),
     bedrooms: str = Form(""),
+    db: AsyncSession = Depends(get_db),
 ):
-    background_tasks.add_task(
-        _run_general_scrape_task,
+    # Create a ScrapeJob record to track this run
+    job = ScrapeJob(
+        status="pending",
         source=source,
         city=city,
         neighborhood=neighborhood,
         property_type=property_type,
         offer_type=offer_type,
         limit=int(limit) if limit else 20,
-        bedrooms=int(bedrooms) if bedrooms else None,
     )
-    
-    # Redirect to scraper page with a success query param
-    success_msg = f"تم بدء جلب البيانات من {source} لحي {neighborhood} بمدينة {city} في الخلفية بنجاح."
-    return RedirectResponse(
-        url=f"/scraper?success={success_msg}",
-        status_code=303,
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    background_tasks.add_task(_run_general_scrape_task, job_id=job.id)
+    return RedirectResponse(url=f"/scraper/{job.id}/progress", status_code=303)
+
+
+@router.get("/scraper/{job_id}/progress", response_class=HTMLResponse)
+async def scraper_progress(
+    request: Request,
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.get(ScrapeJob, job_id)
+    if not job:
+        return HTMLResponse("المهمة غير موجودة", status_code=404)
+    return templates.TemplateResponse(request, "scraper_progress.html", {"job": job})
+
+
+@router.get("/scraper/{job_id}/status", response_class=HTMLResponse)
+async def scraper_status(
+    request: Request,
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.get(ScrapeJob, job_id)
+    if not job:
+        return HTMLResponse("المهمة غير موجودة", status_code=404)
+    return templates.TemplateResponse(request, "scraper_progress.html", {"job": job})
+
+
+@router.get("/scraper/{job_id}/excel")
+async def download_scrape_excel(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.get(ScrapeJob, job_id)
+    if not job or not job.excel_path:
+        return HTMLResponse("لا يوجد ملف إكسيل لهذه المهمة", status_code=404)
+    excel_file = pathlib.Path(job.excel_path)
+    if not excel_file.exists():
+        return HTMLResponse("ملف الإكسيل غير موجود على القرص", status_code=404)
+    return FileResponse(
+        path=str(excel_file),
+        filename=excel_file.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 

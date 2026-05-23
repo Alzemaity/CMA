@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from cma.ai.extractor import ListingExtractor
 from cma.ai.narrator import ReportNarrator
-from cma.models import CMAReport, ClientBrief, Listing, ReportListing
+from cma.models import CMAReport, ClientBrief, Listing, ReportListing, ScrapeJob
 from cma.pipeline.analyzer import MarketAnalyzer
 from cma.pipeline.cleaner import DataCleaner
 from cma.pipeline.matcher import PropertyMatcher
@@ -131,6 +131,7 @@ class CMAOrchestrator:
         neighborhood: str,
         property_type: str,
         offer_type: str,
+        job_id: int | None = None,
         limit: int = 20,
         min_price: float | None = None,
         max_price: float | None = None,
@@ -140,12 +141,23 @@ class CMAOrchestrator:
         """
         Runs a general scraping run for a specific source and criteria,
         persisting all found listings to the database.
+        Updates ScrapeJob status at each step if job_id is provided.
         Returns the number of listings stored.
         """
         logger.info(
             f"Starting general scrape from source={source!r} "
             f"city={city} neighborhood={neighborhood} limit={limit}"
         )
+
+        async def _update_job(status: str, **kwargs):
+            if not job_id:
+                return
+            job = await self.db.get(ScrapeJob, job_id)
+            if job:
+                job.status = status
+                for k, v in kwargs.items():
+                    setattr(job, k, v)
+                await self.db.commit()
 
         # 1. Select scraper and apply limit
         if "bayut" in source.lower():
@@ -158,11 +170,11 @@ class CMAOrchestrator:
             scraper = AqarScraper()
             source_label = "Aqar.fm"
 
-        # Apply user-specified limit to the chosen scraper
         scraper.max_listings = limit
         logger.info(f"Using scraper={source_label} max_listings={limit}")
-            
+
         # 2. Run scraper
+        await _update_job("scraping", source_label=source_label)
         scraped = await scraper.scrape(
             city=city,
             neighborhood=neighborhood,
@@ -173,32 +185,39 @@ class CMAOrchestrator:
             bedrooms=bedrooms,
             category=category,
         )
-        
+
         if not scraped:
             logger.info("No listings found during scraping run.")
+            await _update_job(
+                "done",
+                listings_scraped=0,
+                listings_saved=0,
+                completed_at=datetime.datetime.now(datetime.UTC),
+            )
             return 0
-            
+
+        await _update_job("extracting", listings_scraped=len(scraped))
+
         # 3. Extract structured data via AI
         extraction_input = [(item.raw_html, item.url) for item in scraped]
         structured = await self.extractor.extract_batch(extraction_input)
-        
+
         if not structured:
             logger.warning("Failed to extract structured data from scraped listings.")
+            await _update_job("failed", error_message="فشل استخراج البيانات عبر الذكاء الاصطناعي")
             return 0
-            
+
         # 4. Clean & deduplicate
+        await _update_job("saving")
         cleaned = self.cleaner.clean(structured)
-        
-        # 5. Persist listings to DB, adding source label
+
+        # 5. Persist listings to DB
         saved_count = 0
         for item in cleaned:
             url = item.get("رابط_الإعلان", "")
             if not url:
                 continue
-            
-            # Inject source label
             item["المصدر"] = source_label
-            
             existing = await self.db.execute(
                 select(Listing).where(Listing.source_url == url)
             )
@@ -214,9 +233,27 @@ class CMAOrchestrator:
             else:
                 listing.structured_data = item
                 listing.trust_score = item.get("trust_score", 0)
-                
+
         await self.db.commit()
-        logger.info(f"General scrape complete: stored/updated {saved_count} new listings in DB from {source_label}.")
+        logger.info(f"General scrape complete: saved {saved_count} new listings from {source_label}.")
+
+        # 6. Export Excel for this job
+        excel_path = None
+        if cleaned:
+            excel_path = self.excel_exporter.export(
+                listings=cleaned,
+                city=city,
+                neighborhood=neighborhood,
+                report_id=job_id or 0,
+            )
+
+        await _update_job(
+            "done",
+            listings_scraped=len(scraped),
+            listings_saved=saved_count,
+            excel_path=excel_path,
+            completed_at=datetime.datetime.now(datetime.UTC),
+        )
         return saved_count
 
     # ─────────────────────────────────────────────────────────────────────────
