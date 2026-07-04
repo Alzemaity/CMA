@@ -7,3 +7,6 @@ dist/
 *.egg-info/
 reports/
 .ruff_cache/
+scratch/
+*.png
+*.webp

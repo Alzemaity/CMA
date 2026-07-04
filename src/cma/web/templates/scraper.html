@@ -23,24 +23,60 @@
 
         <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">مصدر البيانات *</label>
-            <div class="grid grid-cols-3 gap-4">
-                <label class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 transition relative">
-                    <input type="radio" name="source" value="aqar" checked class="absolute top-3 right-3 text-blue-600">
-                    <span class="text-2xl mb-1">🏠</span>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="aqar" checked class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🏠</span>
                     <span class="text-sm font-bold text-gray-800">موقع عقار</span>
-                    <span class="text-xs text-gray-400 mt-1">Aqar.fm</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Aqar.fm</span>
                 </label>
-                <label class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 transition relative">
-                    <input type="radio" name="source" value="bayut" class="absolute top-3 right-3 text-blue-600">
-                    <span class="text-2xl mb-1">🏢</span>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="bayut" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🏢</span>
                     <span class="text-sm font-bold text-gray-800">بيوت السعودية</span>
-                    <span class="text-xs text-gray-400 mt-1">Bayut.sa</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Bayut.sa</span>
                 </label>
-                <label class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 transition relative">
-                    <input type="radio" name="source" value="deal" class="absolute top-3 right-3 text-blue-600">
-                    <span class="text-2xl mb-1">🤝</span>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="deal" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🤝</span>
                     <span class="text-sm font-bold text-gray-800">تطبيق ديل</span>
-                    <span class="text-xs text-gray-400 mt-1">DealApp.sa</span>
+                    <span class="text-xs text-gray-400 mt-0.5">DealApp.sa</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="wasalt" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🗺️</span>
+                    <span class="text-sm font-bold text-gray-800">منصة وصلت</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Wasalt.com</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="sakan" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🏡</span>
+                    <span class="text-sm font-bold text-gray-800">منصة سكن</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Sakan.co</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="zaheb" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🔍</span>
+                    <span class="text-sm font-bold text-gray-800">منصة زاهب</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Zaheb.com</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="shobbak" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🖼️</span>
+                    <span class="text-sm font-bold text-gray-800">منصة شباك</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Shobbak.com</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="mstaml" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">🏷️</span>
+                    <span class="text-sm font-bold text-gray-800">مستعمل وجديد</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Mstaml.com</span>
+                </label>
+                <label class="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50/30 transition relative">
+                    <input type="radio" name="source" value="haraj" class="absolute top-2 right-2 text-blue-600">
+                    <span class="text-xl mb-1">📣</span>
+                    <span class="text-sm font-bold text-gray-800">موقع حراج</span>
+                    <span class="text-xs text-gray-400 mt-0.5">Haraj.com.sa</span>
                 </label>
             </div>
         </div>

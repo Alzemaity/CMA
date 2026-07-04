@@ -15,6 +15,7 @@ from cma.report.generator import ReportGenerator
 from cma.scraper.aqar import AqarScraper
 from cma.scraper.bayut import BayutScraper
 from cma.scraper.dealapp import DealAppScraper
+from cma.scraper.fallback import FallbackScraper
 
 logger = logging.getLogger(__name__)
 
@@ -160,12 +161,31 @@ class CMAOrchestrator:
                 await self.db.commit()
 
         # 1. Select scraper and apply limit
-        if "bayut" in source.lower():
+        source_lower = source.lower()
+        if "bayut" in source_lower:
             scraper = BayutScraper()
             source_label = "Bayut.sa"
-        elif "deal" in source.lower():
+        elif "deal" in source_lower:
             scraper = DealAppScraper()
             source_label = "DealApp.sa"
+        elif "wasalt" in source_lower:
+            scraper = FallbackScraper("wasalt.com")
+            source_label = "Wasalt.com"
+        elif "sakan" in source_lower:
+            scraper = FallbackScraper("sakan.co")
+            source_label = "Sakan.co"
+        elif "zaheb" in source_lower:
+            scraper = FallbackScraper("zaheb.com")
+            source_label = "Zaheb.com"
+        elif "shobbak" in source_lower:
+            scraper = FallbackScraper("shobbak.com")
+            source_label = "Shobbak.com"
+        elif "mstaml" in source_lower:
+            scraper = FallbackScraper("mstaml.com")
+            source_label = "Mstaml.com"
+        elif "haraj" in source_lower:
+            scraper = FallbackScraper("haraj.com.sa")
+            source_label = "Haraj.com.sa"
         else:
             scraper = AqarScraper()
             source_label = "Aqar.fm"
